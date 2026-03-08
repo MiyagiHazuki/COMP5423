@@ -1,0 +1,125 @@
+# config/config.yaml
+system:
+  log_level: "INFO"  # DEBUG/INFO/WARNING/ERROR
+  device: "cuda"  # cuda/cpu
+  seed: 42
+
+data:
+  input_file: "./data/original_data/"
+  model_output_dir: "./model/pkl/"
+  data_output_dir: "./data/processed_data/" # save the processed data, which used for training and generating
+  val_path: "./data/original_data/val.jsonl" # validation data path
+  test_path: "./data/original_data/test.jsonl" # test data path
+
+paths:
+  data_root: "./data/data"
+  model_root: "./models/"
+  cache_dir: "./cache/"
+  log_dir: "./logs/"
+
+modules:
+  active:  
+    retrieval: "hybrid"  # bm25/bert_base/hybrid to choose the retrieval method
+    generator: "qwen"
+    evaluator: "eval.metrics_calculation"
+    ui: "webui"
+    process: "process.process"
+
+# retrieval module config
+retrieval:
+  # common options
+  top_k: 5  # default number of documents to return
+  use_plain_text: true  # whether to use plain text rather than markdown
+  max_words: 10  # maximum number of words to extract for the answer
+  
+  # text retrieval model config
+  text_retrieval:
+    method: "hybrid"  # bm25/tfidf/hybrid
+    hybrid_alpha: 0.7  # hybrid mode BM25 weight (0.3tfidf+0.7bm25)
+    
+  # deep embedding retrieval model config
+  deep_retrieval:
+    # BGE-M3 config
+    bgem3:
+      model: "BAAI/bge-m3"
+      api_key: "sk-???"
+      result_path: "./data/result/val_query_vectors.jsonl"
+      faiss_path: "./cache/faiss/bgem3.faiss"
+      chunk_size: 10  # number of documents to process in each batch
+      overlap_ratio: 0.2  # text split overlap ratio (0-0.5)
+      use_weighted_avg: true  # use weighted average rather than simple average
+      auto_load: true  # auto load intermediate results
+    # local BERT config
+    local_embedding:
+      model: "nomic-ai/nomic-bert-2048"
+      doc_path: "./data/processed_data/processed_plain.jsonl"
+      chunk_size: 10
+      overlap_ratio: 0.2
+      auto_load: true
+    
+  # hybrid retrieval model config
+  hybrid:
+    weights: 
+      bm25: 0.4
+      dpr: 0.6
+    fusion_method: "weighted_sum"  # reciprocal_rank/round_robin
+
+  # FAISS config
+  faiss:
+    index_path: "./cache/faiss/"  # FAISS index storage path
+
+# BERT-Base training config
+bert_base:
+  train:
+    model_name_or_path: "nomic-ai/nomic-bert-2048"  # support long sequence pre-trained model
+    shared_weights: false  # whether to share query and document encoder weights
+    temperature: 0.05  # similarity calculation temperature coefficient
+    num_train_epochs: 5  # number of training epochs
+    batch_size: 2  # training batch size
+    learning_rate: 3.0e-5  # learning rate
+    weight_decay: 0.01  # weight decay
+    max_query_length: 128  # maximum length of query text
+    max_ctx_length: 2048  # maximum length of context text (use long sequence ability)
+    warmup_steps: 0  # number of warmup steps
+    adam_epsilon: 1.0e-8  # Adam optimizer epsilon value
+    eval_steps: 0  # evaluate every how many steps, 0 means no evaluation
+    gradient_accumulation_steps: 2  # number of gradient accumulation steps
+    num_workers: 4  # number of data loader workers
+
+# text generation config
+generation:
+  qwen:
+    api_key: "sk-???"
+
+rerank:
+  api_key: "sk-???"
+  url: "https://api.siliconflower.com/v1/rerank"
+
+# WebUI config
+webui:
+  port: 8080
+  presentation: true  # true to open webui / false only for debug
+
+# evaluation config
+evaluation:
+  # general config for evaluation mode
+  default_method: "text"  # default evaluation method: text/deep_embedding/hybrid
+  auto_select: false  # whether to automatically select the default method (true) or prompt the user to select (false)
+  
+  # evaluation metrics config
+  metrics:
+    calculate: true  # whether to calculate evaluation metrics
+    types: ["recall", "mrr"]  # types of metrics to calculate
+  # evaluation output path config
+  output:
+    text: "./data/evaluation/text_evaluation_results.jsonl"
+    deep_embedding: "./data/evaluation/deep_embedding_evaluation_results.jsonl"
+    hybrid: "./data/evaluation/hybrid_evaluation_results.jsonl"
+
+# debug mode config
+debug:
+  train_mode: false # enable training mode (train bert_base model)
+  evaluate_mode: false  # enable evaluation mode (execute evaluation process)
+  process_mode: false # enable processing mode (execute data processing process)
+  vectorize_mode: false # enable vectorization mode (execute document vectorization and create FAISS index)
+  rerank_mode: false # enable reranking mode (execute reranking process)
